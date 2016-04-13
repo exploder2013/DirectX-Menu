@@ -8,7 +8,7 @@ D3Menu			d3		= D3Menu();
 int					screenX = GetSystemMetrics(SM_CXSCREEN);
 int					screenY = GetSystemMetrics(SM_CYSCREEN);
 const				MARGINS margins = { -1, -1, -1, -1 };
-
+bool				isRunning = true;
 
 VOID renderOverlay() {
 	rMGR.clear();
@@ -51,20 +51,25 @@ INT WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	if (!d3.Initilize(&rMGR))
 		MessageBox(NULL, L"Couldn't initialize D3Menu", NULL, NULL), exit(0);
 
-	d3.createMenu( "menu1" );
-	d3.createMenu( "menu2" );
+	d3.createMenu( "menu1", D3DCOLOR_ARGB(255,152,222,42) );
+	PMENUENTRY entry = d3.createMenu( "menu2", D3DCOLOR_ARGB(255,152,222,42) );
 
 	INT v1 = 10;
 	FLOAT v2 = 20;
 	string v3 = "oh hai johnny!";
 
-	d3.createItem( "item1", &v1, D3DCOLOR_ARGB(255,0,0,140), 10, VAR_TYPE::T_INT, nullptr );
-	d3.createItem( "item2", &v2, D3DCOLOR_ARGB(255,0,0,140), 1.5, VAR_TYPE::T_FLOAT, nullptr );
-	d3.createItem( "item3", &v3, D3DCOLOR_ARGB(255,0,0,140), 10, VAR_TYPE::T_STRING, nullptr );
+	d3.createItem( "item1", &v1, D3DCOLOR_ARGB(255,242,37,5), 10, VAR_TYPE::T_INT, nullptr, nullptr, false );
+	d3.createItem( "item2", &v2, D3DCOLOR_ARGB(255,242,37,5), (SIZE_T)1.5, VAR_TYPE::T_FLOAT, nullptr, nullptr, false );
+	d3.createItem( "item3", &v3, D3DCOLOR_ARGB(255,242,37,5), 10, VAR_TYPE::T_STRING, nullptr, nullptr, false );
 
+	d3.createItem( entry,"item_menu1", &v3, D3DCOLOR_ARGB(255,152,222,42), 10, VAR_TYPE::T_STRING, nullptr, nullptr, false );
+	d3.createItem( entry,"item_menu2", &v3, D3DCOLOR_ARGB(255,152,222,42), 10, VAR_TYPE::T_STRING, nullptr, nullptr, false );
+	d3.createItem( entry,"item_menu3", &v3, D3DCOLOR_ARGB(255,152,222,42), 10, VAR_TYPE::T_STRING, nullptr, nullptr, false );
+
+	d3.createToggle( "Toggle1", &isRunning, D3DCOLOR_ARGB(255,0,153,204), nullptr, false );
 
 	MSG msg;
-	while (TRUE)
+	while (isRunning)
 	{
 		d3.handleInput();
 		renderOverlay();

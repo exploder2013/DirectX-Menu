@@ -18,11 +18,22 @@ bool D3Menu::Initilize(rManager * rMGR)
 
 VOID D3Menu::render()
 {
+	// MENU BACKGROUND COLOR r=40; g=40; b=39;
 	if( !isOpen )
 		return VOID();
 
 	SIZE_T posY			= 0;
+	SIZE_T posX			= 3;
 	SIZE_T loopStep		= 0;
+
+	SIZE_T backgroundBox = 0;
+	if (currentEntry)
+	{
+		backgroundBox = currentEntry->items.size() * 16;
+	} else {
+		backgroundBox = ( items.size() + menus.size() ) * 16;
+	}
+	rMGR->FillRGB( posX - 3, posY, 200, backgroundBox, D3DCOLOR_ARGB(255, 40, 40, 39 ) );
 
 	if (currentEntry) // MENU IS OPEN, SO DRAW ONLY IT'S CONTAINERS
 	{
@@ -31,10 +42,12 @@ VOID D3Menu::render()
 		{
 			DWORD color = item->color;
 
-			if (item->isEnabled && loopStep == step ) {
-				color = D3DCOLOR_ARGB( fade, 0, 255, 0 );
+			if (item->isEnabled && loopStep == menuStep) {
+				color = D3DCOLOR_ARGB(fade, 122, 219, 31);
 			} else if (item->isEnabled) {
-				color = D3DCOLOR_ARGB( 255, 0, 0, 255 );
+				color = D3DCOLOR_ARGB(255, 122, 219, 31);
+			} else if (loopStep == menuStep) {
+				color = D3DCOLOR_ARGB(fade, RED(item->color), GREEN(item->color), BLUE(item->color));
 			}
 				
 
@@ -58,6 +71,19 @@ VOID D3Menu::render()
 						text += "<" + *(string*)item->value + ">";
 						break;
 					}
+					case VAR_TYPE::T_BOOL:
+					{
+						BOOL value = *(BOOL*)item->value;
+						string final;
+
+						if (value)
+							final = "ENABLED";
+						else
+							final = "DISABLED";
+
+						text += "<" + final + ">";
+						break;
+					}
 					default:
 					{
 						continue;
@@ -68,7 +94,7 @@ VOID D3Menu::render()
 			}
 			
 
-			rMGR->drawText( item->itemName.c_str(), 0, posY, color );
+			rMGR->drawText( text.c_str(), posX, posY, color );
 			
 			posY += 14;
 			loopStep++;
@@ -80,10 +106,10 @@ VOID D3Menu::render()
 		{
 			DWORD color = entry->color;
 			if (loopStep == step) {
-				color = D3DCOLOR_ARGB(fade, 0, 0, 255);
+				color = D3DCOLOR_ARGB(fade, RED(color), GREEN(color), BLUE(color));
 			}
 
-			rMGR->drawText( entry->entryName.c_str(), 0, posY, color );
+			rMGR->drawText( entry->entryName.c_str(), posX, posY, color );
 			posY += 14;
 
 			loopStep++;
@@ -94,9 +120,11 @@ VOID D3Menu::render()
 			DWORD color = item->color;
 
 			if (item->isEnabled && loopStep == step) {
-				color = D3DCOLOR_ARGB(fade, 0, 255, 0);
+				color = D3DCOLOR_ARGB(fade, 122, 219, 31);
 			} else if (item->isEnabled) {
-				color = D3DCOLOR_ARGB(255, 0, 255, 0);
+				color = D3DCOLOR_ARGB(255, 122, 219, 31);
+			}else if (loopStep == step) {
+				color = D3DCOLOR_ARGB(fade, RED(color), GREEN(color), BLUE(color) );
 			}
 
 			string text = item->itemName;
@@ -119,6 +147,19 @@ VOID D3Menu::render()
 						text += "<" + *(string*)item->value + ">";
 						break;
 					}
+					case VAR_TYPE::T_BOOL:
+					{
+						BOOL value = *(BOOL*)item->value;
+						string final;
+
+						if( value )
+							final = "ENABLED";
+						else
+							final = "DISABLED";
+
+						text += "<" + final + ">";
+						break;
+					}
 					default:
 					{
 						continue;
@@ -129,20 +170,21 @@ VOID D3Menu::render()
 			}
 
 
-			rMGR->drawText(item->itemName.c_str(), 0, posY, color);
+			rMGR->drawText(text.c_str(), posX, posY, color);
 
 			posY += 14;
 			loopStep++;
 		}
 	}
 
+
+	/* FADE */
 	if ((fade + 5) > 255)
 	{
 		fadeOut = TRUE;
 	} else if ( (fade - 5) <= 0 ) {
 		fadeOut = FALSE;
 	}
-
 
 	if (fadeOut)
 	{
@@ -166,12 +208,35 @@ VOID D3Menu::handleInput()
 
 	if (GetAsyncKeyState(VK_DOWN) & 1) // STEP DOWN
 	{
+		if (currentEntry != nullptr)
+		{
+			if (menuStep == (currentEntry->items.size() - 1)) {
+				menuStep = 0;
+			} else {
+				menuStep++;
+			}
+
+			return;
+		}
+
 		if( step == ( menus.size() + items.size() - 1) )
 			step = 0;
 		else { step++; }
 
 	} else if (GetAsyncKeyState(VK_UP) & 1) // STEP UP
 	{
+		if (currentEntry != nullptr)
+		{
+			if (menuStep == 0) 
+			{
+				menuStep = (currentEntry->items.size()-1);
+			} else {
+				menuStep--;
+			}
+
+			return;
+		}
+
 		if( step == 0 )
 			step = ( menus.size() + items.size() - 1);
 		else { step--; }
@@ -179,119 +244,51 @@ VOID D3Menu::handleInput()
 
 	if (GetAsyncKeyState(VK_RIGHT) & 1)
 	{
-		if (step < menus.size())
-		{
-			PMENUENTRY entry	= menus[step];
-
-			entry->isOpen		= true;
-			currentEntry		= entry;
-		} else {
-			PMENUITEM item		= items[step];
-			
-			if (item->value != nullptr)
-			{
-				switch (item->type)
-				{
-				case VAR_TYPE::T_INT:
-					{
-						if (item->stepCallback != nullptr)
-						{
-							stepCallback func = (stepCallback)item->stepCallback;
-							func( item->value, 1 );
-							break;
-						}
-
-						*(INT*)item->value += item->increment;
-						break;
-					}
-				case VAR_TYPE::T_FLOAT:
-					{
-						if (item->stepCallback != nullptr)
-						{
-							stepCallback func = (stepCallback)item->stepCallback;
-							func(item->value, 1);
-							break;
-						}
-
-						*(FLOAT*)item->value += item->increment;
-						break;
-					}
-				case VAR_TYPE::T_STRING:
-					{
-						if (item->stepCallback != nullptr)
-						{
-							callbackString func = (callbackString)item->stepCallback;
-							func( &item->itemValue, (string*)item->value, 1 );
-						}
-						break;
-					}
-					default:
-					{
-
-					}
-				}
-			}
-		}
+		changeValue( VK_RIGHT );
 	} else if (GetAsyncKeyState(VK_LEFT) & 1)
 	{
-		if (step < menus.size())
+		changeValue( VK_LEFT );
+	}
+
+	if (GetAsyncKeyState(VK_BACK) & 1)
+	{
+		if (currentEntry != nullptr)
 		{
-			PMENUENTRY entry = menus[step];
+			PMENUENTRY entry = currentEntry;
 
-			entry->isOpen	= true;
-			currentEntry	= entry;
-		} else {
-			PMENUITEM item = items[step];
+			entry->isOpen = false;
+			currentEntry = nullptr;
 
-			if (item->value != nullptr)
-			{
-				switch (item->type)
-				{
-				case VAR_TYPE::T_INT:
-					{
-						if (item->stepCallback != nullptr)
-						{
-							stepCallback func = (stepCallback)item->stepCallback;
-							func(item->value, -1 );
-							break;
-						}
-
-						*(INT*)item->value -= item->increment;
-						break;
-					}
-				case VAR_TYPE::T_FLOAT:
-					{
-						if (item->stepCallback != nullptr)
-						{
-							stepCallback func = (stepCallback)item->stepCallback;
-							func(item->value, -1);
-							break;
-						}
-
-						*(FLOAT*)item->value -= item->increment;
-						break;
-					}
-				case VAR_TYPE::T_STRING:
-					{
-						if (item->stepCallback != nullptr)
-						{
-							callbackString func = (callbackString)item->stepCallback;
-							func(&item->itemValue, (string*)item->value, -1);
-						}
-						break;
-					}
-					default:
-					{
-
-					}
-				}
-			}
+			menuStep = 0;
 		}
 	}
 
-
 	if (GetAsyncKeyState(VK_RETURN) & 1)
 	{
+		if (currentEntry != nullptr)
+		{
+			PMENUITEM item = items[menuStep];
+
+			if (item->type == VAR_TYPE::T_BOOL && item->value != nullptr)
+			{
+				bool* value = (bool*)item->value;
+				*value = !*value;
+			}
+
+			if (item->callback != nullptr)
+			{
+				item->isEnabled = true;
+				callback func = (callback)item->callback;
+				if (item->threaded)
+				{
+					std::thread thread = std::thread( func, item->value, &item->isEnabled );
+					thread.detach();
+				}
+
+				func(item->value, &item->isEnabled );
+			}
+		}
+
 		if (step < menus.size())
 		{
 			PMENUENTRY entry = menus[step];
@@ -299,12 +296,26 @@ VOID D3Menu::handleInput()
 			entry->isOpen = true;
 			currentEntry = entry;
 		} else {
-			PMENUITEM item = items[step];
+			PMENUITEM item = items[step - menus.size()];
+
+			if (item->type == VAR_TYPE::T_BOOL && item->value != nullptr)
+			{
+				bool* value = (bool*)item->value;
+				*value = !*value;
+			}
 
 			if (item->callback != nullptr)
 			{
+				item->isEnabled = true;
 				callback func = (callback)item->callback;
-				func( item->value );
+				if (item->threaded)
+				{
+					
+					std::thread thread = std::thread(func, item->value, &item->isEnabled);
+					thread.detach();
+				}
+
+				func(item->value, &item->isEnabled);
 			}
 		}
 	}
@@ -312,34 +323,46 @@ VOID D3Menu::handleInput()
 	return VOID();
 }
 
-PMENUITEM D3Menu::createItem(string itemName, LPVOID value, DWORD color,SIZE_T increment, VAR_TYPE type, LPVOID callback)
+PMENUITEM D3Menu::createItem( string itemName, LPVOID value, DWORD color, SIZE_T increment, VAR_TYPE type, LPVOID callback, LPVOID stepCallback, bool threaded )
 {
 	PMENUITEM item		= new MENUITEM;
 
 	item->itemName	= itemName;
 	item->value		= value;
-	item->color		= color;
+
+	if (color == NULL) {
+			item->color	= D3DCOLOR_ARGB(255,242,37,5);
+	} else { item->color = color; }
+
 	item->increment	= increment;
 	item->type		= type;
 	item->callback	= callback;
+	item->stepCallback = stepCallback;
 	item->isEnabled	= FALSE;
+	item->threaded	= threaded;
 	item->itemValue	= 0;
 
 	items.push_back( item );
 	return item;
 }
 
-PMENUITEM D3Menu::createItem(string menuName, string itemName, LPVOID value, DWORD color,SIZE_T increment, VAR_TYPE type, LPVOID callback )
+PMENUITEM D3Menu::createItem(string menuName, string itemName, LPVOID value, DWORD color,SIZE_T increment, VAR_TYPE type, LPVOID callback, LPVOID stepCallback, bool threaded)
 {
 	PMENUITEM item		= new MENUITEM;
 
 	item->itemName	= itemName;
 	item->value		= value;
-	item->color		= color;
+
+	if (color == NULL) {
+		item->color = D3DCOLOR_ARGB(255, 242, 37, 5);
+	} else { item->color = color; }
+
 	item->increment	= increment;
 	item->type		= type;
 	item->callback	= callback;
+	item->stepCallback = stepCallback;
 	item->isEnabled	= FALSE;
+	item->threaded	= threaded;
 	item->itemValue	= 0;
 
 	for (PMENUENTRY entry : menus)
@@ -354,17 +377,23 @@ PMENUITEM D3Menu::createItem(string menuName, string itemName, LPVOID value, DWO
 	return nullptr;
 }
 
-PMENUITEM D3Menu::createItem(PMENUENTRY menu, string itemName, LPVOID value, DWORD color,SIZE_T increment, VAR_TYPE type, LPVOID callback)
+PMENUITEM D3Menu::createItem(PMENUENTRY menu, string itemName, LPVOID value, DWORD color,SIZE_T increment, VAR_TYPE type, LPVOID callback, LPVOID stepCallback, bool threaded )
 {
 	PMENUITEM item		= new MENUITEM;
 
 	item->itemName	= itemName;
 	item->value		= value;
-	item->color		= color;
+
+	if (color == NULL) {
+		item->color = D3DCOLOR_ARGB(255, 242, 37, 5);
+	} else { item->color = color; }
+
 	item->increment	= increment;
 	item->type		= type;
 	item->callback	= callback;
+	item->stepCallback = stepCallback;
 	item->isEnabled	= FALSE;
+	item->threaded	= threaded;
 	item->itemValue	= 0;
 
 	if (menu == nullptr)
@@ -374,12 +403,87 @@ PMENUITEM D3Menu::createItem(PMENUENTRY menu, string itemName, LPVOID value, DWO
 	return item;
 }
 
-PMENUENTRY D3Menu::createMenu(string menuName)
+PMENUITEM D3Menu::createToggle(string itemName, LPVOID value, DWORD color, LPVOID callback, bool threaded)
+{
+	PMENUITEM toggle = new MENUITEM;
+
+	toggle->itemName		= itemName;
+	toggle->value			= value;
+
+	if (color == NULL) {
+		toggle->color = D3DCOLOR_ARGB(255,0,153,204);
+	} else { toggle->color = color; }
+
+	toggle->callback		= callback;
+	toggle->isEnabled		= FALSE;
+	toggle->threaded		= threaded;
+	toggle->type			= VAR_TYPE::T_BOOL;
+
+	items.push_back( toggle );
+	return toggle;
+}
+
+PMENUITEM D3Menu::createToggle(string menuName, string itemName, LPVOID value, DWORD color, LPVOID callback, bool threaded)
+{
+	PMENUITEM item = new MENUITEM;
+
+	item->itemName = itemName;
+	item->value = value;
+
+	if (color == NULL) {
+		item->color = D3DCOLOR_ARGB(255, 0, 153, 204);
+	} else { item->color = color; }
+
+	item->type = VAR_TYPE::T_BOOL;
+	item->callback = callback;
+	item->isEnabled = FALSE;
+	item->threaded = threaded;
+
+	for (PMENUENTRY entry : menus)
+	{
+		if (!menuName.compare(entry->entryName))
+		{
+			entry->items.push_back(item);
+			return item;
+		}
+	}
+
+	return nullptr;
+}
+
+PMENUITEM D3Menu::createToggle(PMENUENTRY menu, string itemName, LPVOID value, DWORD color, LPVOID callback, bool threaded)
+{
+	PMENUITEM item = new MENUITEM;
+
+	item->itemName = itemName;
+	item->value = value;
+
+	if (color == NULL) {
+		item->color = D3DCOLOR_ARGB(255, 0, 153, 204);
+	} else { item->color = color; }
+
+	item->type = VAR_TYPE::T_BOOL;
+	item->callback = callback;
+	item->isEnabled = FALSE;
+	item->threaded = threaded;
+
+	if (menu == nullptr)
+		return nullptr;
+
+	menu->items.push_back(item);
+	return item;
+}
+
+PMENUENTRY D3Menu::createMenu(string menuName, DWORD color )
 {
 	PMENUENTRY entry	= new MENUENTRY;
 
 	entry->entryName		= menuName;
-	entry->color			= D3DCOLOR_ARGB( 255, 0, 255, 0 );
+
+	if (color == NULL) {
+		entry->color = D3DCOLOR_ARGB(255,152,222,42);
+	} else { entry->color = color; }
+
 	entry->isOpen		= false;
 
 	menus.push_back( entry );
@@ -617,6 +721,151 @@ VOID D3Menu::setItemValue(PMENUENTRY menu, string itemName, LPVOID value)
 		if (!itemName.compare(item->itemName))
 		{
 			item->value = value;
+		}
+	}
+}
+
+VOID D3Menu::changeValue(DWORD vkCode)
+{
+	if (vkCode == VK_LEFT)
+	{
+		PMENUITEM item = nullptr;
+
+		if (currentEntry != nullptr)
+		{
+			try {
+				item = currentEntry->items.at(menuStep);
+			} catch (std::exception e) {
+				UNREFERENCED_PARAMETER( e );
+				return;
+			}
+		} else {
+			if (step > menus.size() - 1) {
+				try {
+					item = items.at(step - menus.size());
+				} catch (std::exception e) {
+					UNREFERENCED_PARAMETER(e);
+					return;
+				}
+			} else {
+				return; // MENU SELECTED
+			}
+		}
+
+		if (item->value != nullptr)
+		{
+			switch (item->type)
+			{
+				case VAR_TYPE::T_INT:
+				{
+					if (item->stepCallback != nullptr)
+					{
+						stepCallback func = (stepCallback)item->stepCallback;
+						func(item->value, -1);
+						break;
+					}
+
+					*(INT*)item->value -= item->increment;
+					break;
+				}
+				case VAR_TYPE::T_FLOAT:
+				{
+					if (item->stepCallback != nullptr)
+					{
+						stepCallback func = (stepCallback)item->stepCallback;
+						func(item->value, -1);
+						break;
+					}
+
+					*(FLOAT*)item->value -= item->increment;
+					break;
+				}
+				case VAR_TYPE::T_STRING:
+				{
+					if (item->stepCallback != nullptr)
+					{
+						callbackString func = (callbackString)item->stepCallback;
+						func(&item->itemValue, (string*)item->value, -1);
+					}
+					break;
+				}
+				default:
+				{
+
+				}
+			}
+		}
+	} else {
+		if (step < menus.size())
+		{
+			PMENUENTRY entry = menus[step];
+
+			entry->isOpen = true;
+			currentEntry = entry;
+
+		} else {
+			PMENUITEM item = nullptr;
+
+			if (currentEntry != nullptr)
+			{
+				try {
+					item = currentEntry->items.at(menuStep);
+				} catch (std::exception e) {
+					UNREFERENCED_PARAMETER(e);
+					return;
+				}
+			} else { 
+				try {
+					item = items.at( step - menus.size() ); 
+				} catch (std::exception e) {
+					UNREFERENCED_PARAMETER(e);
+					return;
+				}
+			}
+
+			if (item->value != nullptr)
+			{
+				switch (item->type)
+				{
+					case VAR_TYPE::T_INT:
+					{
+						if (item->stepCallback != nullptr)
+						{
+							stepCallback func = (stepCallback)item->stepCallback;
+							func(item->value, 1);
+							break;
+						}
+
+						*(INT*)item->value += item->increment;
+						break;
+					}
+					case VAR_TYPE::T_FLOAT:
+					{
+						if (item->stepCallback != nullptr)
+						{
+							stepCallback func = (stepCallback)item->stepCallback;
+							func(item->value, 1);
+							break;
+						}
+
+						*(FLOAT*)item->value += item->increment;
+						break;
+					}
+					case VAR_TYPE::T_STRING:
+					{
+						if (item->stepCallback != nullptr)
+						{
+							callbackString func = (callbackString)item->stepCallback;
+							func(&item->itemValue, (string*)item->value, 1);
+						}
+						break;
+					}
+					default:
+					{
+
+					}
+				}
+			}
 		}
 	}
 }
